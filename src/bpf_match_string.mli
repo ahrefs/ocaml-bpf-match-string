@@ -1,7 +1,10 @@
 type t
 
 val (@>) : t -> t -> t
-(** combine two programs sequencially: [a %> b] will execute [a] then execute [b] *)
+(** combine two programs sequentially: [a %> b] will execute [a] then execute [b] *)
+
+val concat : t list -> t
+(** combine list of programs sequentially *)
 
 val skip : int -> t
 (** [skip n] generates instructions to skip [n] chars or exit false if reaching EOS *)
@@ -19,7 +22,7 @@ val skip_to_char : char -> t
 (** [skip_to_char c] generates instructions to move just after the first occurence of c exit false if reaching EOS *)
 
 val assemble : t -> string
-(* exemple :
+(* example :
 
     assemble begin 
       skip 4 @>

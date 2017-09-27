@@ -5,6 +5,8 @@ type t = string EBPF.insn list
 
 let (@>) p1 p2 = p1 @ p2
 
+let concat = List.concat
+
 (* buffer global context : R1 = ptr  R2 = len *)
 let ptr = R1
 let len = R2
