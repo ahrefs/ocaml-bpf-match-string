@@ -1,7 +1,14 @@
 open Prelude
+open Printf
 open EBPF
 
 type t = string EBPF.insn list
+
+type code =
+  | Skip of int
+  | MatchString of string
+  | CheckEOS of [`Eos | `NotEos] * bool
+  | SkipToChar of char
 
 let (@>) p1 p2 = p1 @ p2
 
@@ -133,6 +140,21 @@ let prog n =
   n @
   exit_true' @
   exit_false' 
+
+let string_of_code = function
+  | Skip i -> sprintf "Skip %d" i
+  | MatchString s -> sprintf "MatchString %S" s
+  | CheckEOS (cond, ret_val) -> sprintf "CheckEOS (%s, %b)" (match cond with `Eos -> "`Eos" | `NotEos -> "`NotEos") ret_val
+  | SkipToChar c -> sprintf "SkipToChar %c" c
+
+let make l =
+  let map = function
+    | Skip i -> skip i
+    | MatchString s -> match_string s
+    | CheckEOS (cond, ret_val) -> check_eos cond ret_val
+    | SkipToChar c -> skip_to_char c
+  in
+  concat (List.map map l)
 
 let assemble n = EBPF.assemble ~options:({ default with jump_back = true }) @@ prog n
 

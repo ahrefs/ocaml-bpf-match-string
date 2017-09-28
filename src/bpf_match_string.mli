@@ -1,5 +1,11 @@
 type t
 
+type code =
+  | Skip of int
+  | MatchString of string
+  | CheckEOS of [`Eos | `NotEos] * bool
+  | SkipToChar of char
+
 val (@>) : t -> t -> t
 (** combine two programs sequentially: [a %> b] will execute [a] then execute [b] *)
 
@@ -20,6 +26,10 @@ val check_eos : [`Eos | `NotEos ] -> bool -> t
 
 val skip_to_char : char -> t
 (** [skip_to_char c] generates instructions to move just after the first occurence of c exit false if reaching EOS *)
+
+val string_of_code : code -> string
+
+val make : code list -> t
 
 val assemble : t -> string
 (* example :
