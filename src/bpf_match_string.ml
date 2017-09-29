@@ -24,12 +24,12 @@ let exit_prog value =
     ret
   ]
 
-let exit_true' = 
+let exit_true' =
   [
     label "exit_true"
   ] @ exit_prog true
 
-let exit_false' = 
+let exit_false' =
   [
     label "exit_false"
   ] @ exit_prog false
@@ -58,7 +58,7 @@ let skip_to_char c =
   ]
 
 let check_eos cond ret_val =
-  let op = 
+  let op =
     match cond with
     | `Eos -> `NE
     | `NotEos -> `EQ
@@ -93,7 +93,7 @@ let match_string str =
   let rec unrolled idx str =
     let remaining = CCString.Sub.length str in
     match remaining with
-    | 0 -> [] 
+    | 0 -> []
     | 1 -> [ldx' B idx; jmp_out (extract_int 1 str) ]
     | 2 -> [ldx' H idx; jmp_out (extract_int 2 str) ]
     | 4 -> [ldx' W idx; jmp_out (extract_int 4 str)]
@@ -103,7 +103,7 @@ let match_string str =
             if n > 4 then begin
               let acc = [ldx' W idx; jmp_out (extract_int 4 str)] in
               (acc, CCString.Sub.sub str 4 (n - 4),  n - 4, idx + 4)
-            end else 
+            end else
             ([], str, n, idx)
           in
           let tail =
@@ -111,7 +111,7 @@ let match_string str =
             List.map (fun i ->
               let str = CCString.Sub.sub str i 1 in
               [ ldx' B (idx + i); jmp_out (extract_int 1 str) ]
-            ) |> 
+            ) |>
             List.flatten
           in
           acc @ tail
@@ -139,13 +139,13 @@ let match_string str =
 let prog n =
   n @
   exit_true' @
-  exit_false' 
+  exit_false'
 
 let string_of_code = function
   | Skip i -> sprintf "Skip %d" i
   | MatchString s -> sprintf "MatchString %S" s
   | CheckEOS (cond, ret_val) -> sprintf "CheckEOS (%s, %b)" (match cond with `Eos -> "`Eos" | `NotEos -> "`NotEos") ret_val
-  | SkipToChar c -> sprintf "SkipToChar %c" c
+  | SkipToChar c -> sprintf "SkipToChar %C" c
 
 let make l =
   let map = function
