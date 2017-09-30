@@ -2,7 +2,9 @@ open Prelude
 open Printf
 open EBPF
 
-type t = string EBPF.insn list
+type result = True | False
+
+type t = result EBPF.insn list
 
 type code =
   | Skip of int
@@ -26,25 +28,25 @@ let exit_prog value =
 
 let exit_true' =
   [
-    label "exit_true"
+    label True
   ] @ exit_prog true
 
 let exit_false' =
   [
-    label "exit_false"
+    label False
   ] @ exit_prog false
 
 let skip n =
   [
     movi R5 n;
-    jmp "exit_false" R5 `GT len;
+    jmp False R5 `GT len;
     subi len n;
     addi ptr n;
   ]
 
 let bound_check =
   [
-    jmpi "exit_false" len `EQ 0;
+    jmpi False len `EQ 0;
   ]
 
 
@@ -89,7 +91,7 @@ let match_string str =
         !r
     | n -> Exn.fail "unsupported unrolling size %d" n
   in
-  let jmp_out i = jmpi "exit_false" R3 `NE (Int64.to_int i) in
+  let jmp_out i = jmpi False R3 `NE (Int64.to_int i) in
   let rec unrolled idx str =
     let remaining = CCString.Sub.length str in
     match remaining with
@@ -120,7 +122,7 @@ let match_string str =
           let acc =
             [ ldx' DW idx ] @
             load_dw R4 R5 c @
-            [ jmp "exit_false" R3 `NE R4]
+            [ jmp False R3 `NE R4]
           in
           acc @ unrolled (idx + 8) (CCString.Sub.sub str 8 (CCString.Sub.length str - 8))
         end
@@ -128,7 +130,7 @@ let match_string str =
   let length = String.length str in
   [
     movi R5 length;
-    jmp "exit_false" R5 `GT R2 ;
+    jmp False R5 `GT R2 ;
   ] @
   unrolled 0 (CCString.Sub.make str 0 ~len:(String.length str)) @
   [
