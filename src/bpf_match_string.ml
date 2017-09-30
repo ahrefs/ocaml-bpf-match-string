@@ -26,15 +26,9 @@ let exit_prog value =
     ret
   ]
 
-let exit_true' =
-  [
-    label True
-  ] @ exit_prog true
+let exit_true' = label True :: exit_prog true
 
-let exit_false' =
-  [
-    label False
-  ] @ exit_prog false
+let exit_false' = label False :: exit_prog false
 
 let skip n =
   [
