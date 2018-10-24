@@ -9,7 +9,7 @@ type t = result EBPF.insn list
 type code =
   | Skip of int
   | MatchString of string
-  | CheckEOS of [`Eos | `NotEos] * bool
+  | CheckEOS of bool
   | SkipToChar of char
 
 let (@>) p1 p2 = p1 @ p2
@@ -53,13 +53,9 @@ let skip_to_char c =
     jmpi_ (-5) R3 `NE (Char.code c);
   ]
 
-let check_eos cond ret_val =
-  let op =
-    match cond with
-    | `Eos -> `NE
-    | `NotEos -> `EQ
-  in
-  let exit_val = exit_prog ret_val in
+let check_eos cond =
+  let op = if cond then `EQ else `NE in
+  let exit_val = exit_prog false in
   jmpi_ (List.length exit_val) len op 0 ::
   exit_val
 
@@ -140,14 +136,14 @@ let prog n =
 let string_of_code = function
   | Skip i -> sprintf "Skip %d" i
   | MatchString s -> sprintf "MatchString %S" s
-  | CheckEOS (cond, ret_val) -> sprintf "CheckEOS (%s, %b)" (match cond with `Eos -> "`Eos" | `NotEos -> "`NotEos") ret_val
+  | CheckEOS b -> sprintf "CheckEOS %b" b
   | SkipToChar c -> sprintf "SkipToChar %C" c
 
 let make l =
   let map = function
     | Skip i -> skip i
     | MatchString s -> match_string s
-    | CheckEOS (cond, ret_val) -> check_eos cond ret_val
+    | CheckEOS b -> check_eos b
     | SkipToChar c -> skip_to_char c
   in
   concat (List.map map l)

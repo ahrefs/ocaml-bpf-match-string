@@ -3,7 +3,7 @@ type t
 type code =
   | Skip of int
   | MatchString of string
-  | CheckEOS of [`Eos | `NotEos] * bool
+  | CheckEOS of bool
   | SkipToChar of char
 
 val (@>) : t -> t -> t
@@ -18,10 +18,10 @@ val skip : int -> t
 val match_string : string -> t
 (** [match_string "hello"] tries to match current postion with "hello" or exit false *)
 
-val check_eos : [`Eos | `NotEos ] -> bool -> t
+val check_eos : bool -> t
 (**
-   [check_eos `Eos b] will exit with [b] if current position is end of string 
-   [check_eos `NotEos b] will exit with [b] if current position is not end of string 
+   [check_eos false] will exit false if current position is end of string
+   [check_eos true] will exit false if current position is not end of string
 *)
 
 val skip_to_char : char -> t
@@ -34,10 +34,10 @@ val make : code list -> t
 val assemble : t -> string
 (* example :
 
-    assemble begin 
+    assemble begin
       skip 4 @>
       skip_to_char '%' @>
       match_string "hello world" @>
-      check_eos `NotEos false
+      check_eos true
     end
 *)
