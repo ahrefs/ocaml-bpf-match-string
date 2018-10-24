@@ -9,6 +9,7 @@ type t = result EBPF.insn list
 type code =
   | Skip of int
   | MatchString of string
+  | MismatchChars of char list
   | CheckEOS of bool
   | SkipToChar of char
 
@@ -118,6 +119,14 @@ let match_string str =
     addi ptr length;
   ]
 
+let mismatch_chars l =
+  match l with
+  | [] -> []
+  | _ ->
+  bound_check ::
+  ldx B R3 (ptr, 0) ::
+  List.map (fun c -> jmpi False R3 `EQ (Char.code c)) l
+
 let prog n =
   n @
   exit_true' @
@@ -126,6 +135,7 @@ let prog n =
 let string_of_code = function
   | Skip i -> sprintf "Skip %d" i
   | MatchString s -> sprintf "MatchString %S" s
+  | MismatchChars l -> sprintf "MismatchChars %s" (Stre.list (sprintf "%C") l)
   | CheckEOS b -> sprintf "CheckEOS %b" b
   | SkipToChar c -> sprintf "SkipToChar %C" c
 
@@ -133,6 +143,7 @@ let make l =
   let map = function
     | Skip i -> skip i
     | MatchString s -> match_string s
+    | MismatchChars l -> mismatch_chars l
     | CheckEOS b -> check_eos b
     | SkipToChar c -> skip_to_char c
   in
