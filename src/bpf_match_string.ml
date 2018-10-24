@@ -21,51 +21,42 @@ let ptr = R1
 let len = R2
 
 let exit_prog value =
-  [
-    movi R0 (if value then 1 else 0);
-    ret
-  ]
+  movi R0 (if value then 1 else 0) ::
+  ret ::
+  []
 
 let exit_true' = label True :: exit_prog true
 
 let exit_false' = label False :: exit_prog false
 
-let skip n =
-  [
-    movi R5 n;
-    jmp False R5 `GT len;
-    subi len n;
-    addi ptr n;
-  ]
+let skip n = [
+  movi R5 n;
+  jmp False R5 `GT len;
+  subi len n;
+  addi ptr n;
+]
 
-let bound_check =
-  [
-    jmpi False len `EQ 0;
-  ]
-
+let bound_check = jmpi False len `EQ 0
 
 (* XXX slow could be unrolled / vectorized *)
-let skip_to_char c =
-  bound_check @ [
-    ldx B R3 (ptr, 0);
-    subi len 1;
-    addi ptr 1;
-    jmpi_ (-5) R3 `NE (Char.code c);
-  ]
+let skip_to_char c = [
+  bound_check;
+  ldx B R3 (ptr, 0);
+  subi len 1;
+  addi ptr 1;
+  jmpi_ (-5) R3 `NE (Char.code c);
+]
 
 let check_eos cond =
-  let op = if cond then `EQ else `NE in
-  let exit_val = exit_prog false in
-  jmpi_ (List.length exit_val) len op 0 ::
-  exit_val
+  let op = if cond then `NE else `EQ in
+  [ jmpi False len op 0; ]
 
-
-let load_dw r1 r2 i =
+let load_dw r1 r2 i l =
   movi r1 Int64.(logand 0xFFFFFFFFL i |> to_int) ::
   movi r2 Int64.(logand 0xFFFFFFFFL (shift_right_logical i 32) |> to_int) ::
   lshi r2 32 ::
   or_ r1 r2 ::
-  []
+  l
 
 let match_string str =
   let ldx' size at = EBPF.ldx size R3 (ptr, at) in
@@ -110,18 +101,17 @@ let match_string str =
         end else begin
           let c = extract_int 8 str in
           let acc =
-            [ ldx' DW idx ] @
-            load_dw R4 R5 c @
-            [ jmp False R3 `NE R4]
+            ldx' DW idx ::
+            load_dw R4 R5 c [
+              jmp False R3 `NE R4;
+            ]
           in
           acc @ unrolled (idx + 8) (CCString.Sub.sub str 8 (CCString.Sub.length str - 8))
         end
   in
   let length = String.length str in
-  [
-    movi R5 length;
-    jmp False R5 `GT R2 ;
-  ] @
+  movi R5 length ::
+  jmp False R5 `GT R2 ::
   unrolled 0 (CCString.Sub.make str 0 ~len:(String.length str)) @
   [
     subi len length;
