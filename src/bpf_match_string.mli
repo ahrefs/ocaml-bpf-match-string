@@ -3,6 +3,7 @@ type t
 type code =
   | Skip of int
   | MatchString of string
+  | MatchChars of char list
   | MismatchChars of char list
   | CheckEOS of bool
   | SkipToChar of char
@@ -18,6 +19,9 @@ val skip : int -> t
 
 val match_string : string -> t
 (** [match_string "hello"] tries to match current postion with "hello" or exit false *)
+
+val match_chars : char list -> t
+(** [match_chars l] will exit true if char at current position is one of the list [l]; does not advance position *)
 
 val mismatch_chars : char list -> t
 (** [mismatch_chars l] will exit false if char at current position is one of the list [l]; does not advance position *)
