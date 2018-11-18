@@ -16,6 +16,9 @@ type code =
     *)
   | SkipToChar of char
     (** [Skip_to_char c] generates instructions to move just after the first occurence of c exit false if reaching EOS *)
+  | And of code list list
+  | Or of code list list
+  | Not of code list
 
 val string_of_code : code -> string
 
