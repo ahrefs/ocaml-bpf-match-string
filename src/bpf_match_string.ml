@@ -18,6 +18,9 @@ type code =
 let ptr = R1
 let len = R2
 
+(* stack pointer : R10 *)
+let stack = R10
+
 type context = {
   true_ : label;
   false_ : label;
@@ -33,6 +36,39 @@ let jump_or_skip lbl next l = if lbl = next then l else jump lbl l
 let jump_true { true_; next; _ } l = jump_or_skip true_ next l
 
 let jump_false { false_; next; _ } l = jump_or_skip false_ next l
+
+let push reg l = stx DW (stack, -8) reg :: subi stack 8 :: l
+
+let pop reg l = ldx DW reg (stack, 0) :: addi stack 8 :: l
+
+let push_state (cur, l) = cur, push len l
+
+let pop_state l =
+  pop R3 @@
+  sub len R3 :: (* delta = len - old_len *)
+  add ptr R3 :: (* ptr += delta *)
+  mov len R3 :: (* len = old_len *)
+  l
+
+let drop_state l =
+  addi R10 8 ::
+  l
+
+let with_backtrack what f { true_; false_; next; } (cur, l) =
+  let (pop_true, pop_false) =
+    match what with
+    | true -> pop_state, drop_state
+    | false -> drop_state, pop_state
+  in
+  let ctx = { true_ = cur; false_ = cur + 1; next = cur; } in
+  push_state @@
+    f ctx @@
+  label cur @@
+    pop_true @@
+    jump true_ @@
+  label (cur + 1) @@
+    pop_false @@
+    jump_or_skip false_ next l
 
 let bound_check ctx l = jmpi ctx.false_ len `EQ 0 :: l
 
