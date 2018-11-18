@@ -2,9 +2,9 @@ open Prelude
 open Printf
 open EBPF
 
-type result = True | False
+type label = int
 
-type t = result EBPF.insn list
+type t = label EBPF.insn list
 
 type code =
   | Skip of int
@@ -14,44 +14,50 @@ type code =
   | CheckEOS of bool
   | SkipToChar of char
 
-let (@>) p1 p2 = p1 @ p2
-
-let concat = List.concat
-
 (* buffer global context : R1 = ptr  R2 = len *)
 let ptr = R1
 let len = R2
 
-let exit_prog value =
-  movi R0 (if value then 1 else 0) ::
-  ret ::
-  []
+type context = {
+  true_ : label;
+  false_ : label;
+  next : label;
+}
 
-let exit_true' = label True :: exit_prog true
+let label lbl l = label lbl :: l
 
-let exit_false' = label False :: exit_prog false
+let jump lbl l = jump lbl :: l
 
-let skip n = [
-  movi R5 n;
-  jmp False R5 `GT len;
-  subi len n;
-  addi ptr n;
-]
+let jump_or_skip lbl next l = if lbl = next then l else jump lbl l
 
-let bound_check = jmpi False len `EQ 0
+let jump_true { true_; next; _ } l = jump_or_skip true_ next l
+
+let jump_false { false_; next; _ } l = jump_or_skip false_ next l
+
+let bound_check ctx l = jmpi ctx.false_ len `EQ 0 :: l
+
+let skip n ctx (cur, l) =
+  cur,
+  movi R5 n ::
+  jmp ctx.false_ R5 `GT len ::
+  subi len n ::
+  addi ptr n ::
+  jump_true ctx l
 
 (* XXX slow could be unrolled / vectorized *)
-let skip_to_char c = [
-  bound_check;
-  ldx B R3 (ptr, 0);
-  subi len 1;
-  addi ptr 1;
-  jmpi_ (-5) R3 `NE (Char.code c);
-]
+let skip_to_char c ctx (cur, l) =
+  cur + 1,
+  label cur @@
+    bound_check ctx @@
+    ldx B R3 (ptr, 0) ::
+    subi len 1 ::
+    addi ptr 1 ::
+    jmpi cur R3 `NE (Char.code c) ::
+  jump_true ctx l
 
-let check_eos cond =
-  let op = if cond then `NE else `EQ in
-  [ jmpi False len op 0; ]
+let check_eos cond ctx (cur, l) =
+  cur,
+  jmpi ctx.false_ len (if cond then `NE else `EQ) 0 :: jump_true ctx l
 
 let load_dw r1 r2 i l =
   movi r1 Int64.(logand 0xFFFFFFFFL i |> to_int) ::
@@ -60,7 +66,7 @@ let load_dw r1 r2 i l =
   or_ r1 r2 ::
   l
 
-let match_string str =
+let match_string str ctx (cur, l) =
   let ldx' size at = EBPF.ldx size R3 (ptr, at) in
   let extract_int count str =
     match count with
@@ -74,7 +80,7 @@ let match_string str =
         !r
     | n -> Exn.fail "unsupported unrolling size %d" n
   in
-  let jmp_out i = jmpi False R3 `NE (Int64.to_int i) in
+  let jmp_out i = jmpi ctx.false_ R3 `NE (Int64.to_int i) in
   let rec unrolled idx str =
     let remaining = CCString.Sub.length str in
     match remaining with
@@ -105,41 +111,34 @@ let match_string str =
           let acc =
             ldx' DW idx ::
             load_dw R4 R5 c [
-              jmp False R3 `NE R4;
+              jmp ctx.false_ R3 `NE R4;
             ]
           in
           acc @ unrolled (idx + 8) (CCString.Sub.sub str 8 (CCString.Sub.length str - 8))
         end
   in
   let length = String.length str in
+  cur,
   movi R5 length ::
-  jmp False R5 `GT R2 ::
+  jmp ctx.false_ R5 `GT R2 ::
   unrolled 0 (CCString.Sub.make str 0 ~len:(String.length str)) @
-  [
-    subi len length;
-    addi ptr length;
-  ]
+  begin
+    subi len length ::
+    addi ptr length ::
+    jump_true ctx l
+  end
 
-let match_chars l =
-  match l with
-  | [] -> [ jump False; ]
-  | _ ->
-  bound_check ::
-  ldx B R3 (ptr, 0) ::
-  fst (List.fold_left (fun (l, ofs) c -> jmpi_ ofs R3 `EQ (Char.code c) :: l, ofs + 1) ([ jump False; ], 1) l)
+let match_chars set ctx (cur, l) =
+  cur,
+  bound_check ctx @@
+  let l = List.fold_left (fun l c -> jmpi ctx.true_ R3 `EQ (Char.code c) :: l) (jump_false ctx l) set in
+  if set = [] then l else ldx B R3 (ptr, 0) :: l
 
-let mismatch_chars l =
-  bound_check ::
-  match l with
-  | [] -> []
-  | _ ->
-  ldx B R3 (ptr, 0) ::
-  List.map (fun c -> jmpi False R3 `EQ (Char.code c)) l
-
-let prog n =
-  n @
-  exit_true' @
-  exit_false'
+let mismatch_chars set ctx (cur, l) =
+  cur,
+  bound_check ctx @@
+  let l = List.fold_left (fun l c -> jmpi ctx.false_ R3 `EQ (Char.code c) :: l) (jump_true ctx l) set in
+  if set = [] then l else ldx B R3 (ptr, 0) :: l
 
 let string_of_code = function
   | Skip i -> sprintf "Skip %d" i
@@ -158,7 +157,21 @@ let make l =
     | CheckEOS b -> check_eos b
     | SkipToChar c -> skip_to_char c
   in
-  concat (List.map map l)
+  let ctx = { true_ = 1; false_ = 0; next = 1; } in
+  List.rev l |>
+  List.fold_left (fun acc ms -> map ms ctx acc) begin
+    2,
+    label 1 begin
+      movi R0 1 ::
+      ret ::
+    label 0 begin
+      movi R0 0 ::
+      ret ::
+      []
+    end (* label 0 *)
+    end (* label 1 *)
+  end |>
+  snd
 
-let assemble n = EBPF.assemble ~options:({ default with jump_back = true }) @@ prog n
+let assemble n = EBPF.assemble ~options:({ default with jump_back = true }) n
 

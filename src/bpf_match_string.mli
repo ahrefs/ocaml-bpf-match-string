@@ -2,50 +2,32 @@ type t
 
 type code =
   | Skip of int
+    (** [Skip n] generates instructions to skip [n] chars or exit false if reaching EOS *)
   | MatchString of string
+    (** [Match_string "hello"] tries to match current postion with "hello" or exit false *)
   | MatchChars of char list
+    (** [Match_chars l] will exit true if char at current position is one of the list [l]; does not advance position *)
   | MismatchChars of char list
+    (** [Mismatch_chars l] will exit false if char at current position is one of the list [l]; does not advance position *)
   | CheckEOS of bool
+    (**
+       [Check_eos false] will exit false if current position is end of string
+       [Check_eos true] will exit false if current position is not end of string
+    *)
   | SkipToChar of char
-
-val (@>) : t -> t -> t
-(** combine two programs sequentially: [a %> b] will execute [a] then execute [b] *)
-
-val concat : t list -> t
-(** combine list of programs sequentially *)
-
-val skip : int -> t
-(** [skip n] generates instructions to skip [n] chars or exit false if reaching EOS *)
-
-val match_string : string -> t
-(** [match_string "hello"] tries to match current postion with "hello" or exit false *)
-
-val match_chars : char list -> t
-(** [match_chars l] will exit true if char at current position is one of the list [l]; does not advance position *)
-
-val mismatch_chars : char list -> t
-(** [mismatch_chars l] will exit false if char at current position is one of the list [l]; does not advance position *)
-
-val check_eos : bool -> t
-(**
-   [check_eos false] will exit false if current position is end of string
-   [check_eos true] will exit false if current position is not end of string
-*)
-
-val skip_to_char : char -> t
-(** [skip_to_char c] generates instructions to move just after the first occurence of c exit false if reaching EOS *)
+    (** [Skip_to_char c] generates instructions to move just after the first occurence of c exit false if reaching EOS *)
 
 val string_of_code : code -> string
 
 val make : code list -> t
 
 val assemble : t -> string
-(* example :
 
-    assemble begin
-      skip 4 @>
-      skip_to_char '%' @>
-      match_string "hello world" @>
-      check_eos true
-    end
+(* example :
+    assemble @@ make [
+      Skip 4;
+      Skip_to_char '%';
+      Match_string "hello world";
+      Check_eos true;
+    ]
 *)
