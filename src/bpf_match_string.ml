@@ -216,8 +216,8 @@ and or_ prog (ctx, l) =
     with_backtrack `False (exec prog) (ctx, l) |>
     retry ctx
   end (ctx, l)
-and not_ prog (ctx, l) =
-  with_backtrack `Both (exec prog) (ctx, l)
+and not_ prog ({ true_; false_; _ } as ctx, l) =
+  with_backtrack `Both (exec prog) ({ ctx with true_ = false_; false_ = true_; }, l)
 
 let rec string_of_code = function
   | Skip i -> sprintf "Skip %d" i
