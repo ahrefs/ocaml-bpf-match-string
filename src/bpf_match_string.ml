@@ -30,6 +30,7 @@ type context = {
   false_ : label;
   next : label;
   cur : label;
+  stack : bool;
 }
 
 let label lbl l = label lbl :: l
@@ -59,14 +60,14 @@ let drop_state l =
   addi stack 8 ::
   l
 
-let with_backtrack what f ({ true_; false_; cur; next; }, l) =
+let with_backtrack what f ({ true_; false_; cur; next; _ }, l) =
   let (pop_true, pop_false) =
     match what with
     | `True -> pop_state, drop_state
     | `False -> drop_state, pop_state
     | `Both -> pop_state, pop_state
   in
-  let ctx = { true_ = cur; false_ = cur + 1; cur = cur + 2; next = cur; } in
+  let ctx = { true_ = cur; false_ = cur + 1; cur = cur + 2; next = cur; stack = true; } in
   push_state @@
   f begin
     ctx,
@@ -195,10 +196,10 @@ let rec map_code code =
   | And l -> and_ l
   | Or l -> or_ l
   | Not l -> not_ l
-and continue { false_; _ } ({ cur; _ }, l) =
-  { true_ = cur; false_; next = cur; cur = cur + 1; }, label cur l
-and retry { true_; _ } ({ cur; _ }, l) =
-  { true_; false_ = cur; next = cur; cur = cur + 1; }, label cur l
+and continue { false_; _ } ({ cur; stack; _ }, l) =
+  { true_ = cur; false_; next = cur; cur = cur + 1; stack; }, label cur l
+and retry { true_; _ } ({ cur; stack; _ }, l) =
+  { true_; false_ = cur; next = cur; cur = cur + 1; stack; }, label cur l
 and exec prog (ctx, l) =
   List.rev prog |>
   List.fold_left begin fun (ctx, l) code ->
@@ -233,8 +234,9 @@ let rec string_of_code = function
 
 let make prog =
   let exit value l = label value @@ movi R0 value :: ret :: l in
-  mov stack frame ::
-  snd (exec prog ({ true_ = 1; false_ = 0; next = 1; cur = 2; }, exit 1 @@ exit 0 []))
+  let init_stack (ctx, l) = if ctx.stack then mov stack frame :: l else l in
+  exec prog ({ true_ = 1; false_ = 0; next = 1; cur = 2; stack = false; }, exit 1 @@ exit 0 []) |>
+  init_stack
 
 let assemble n = EBPF.assemble ~options:({ default with jump_back = true }) n
 
