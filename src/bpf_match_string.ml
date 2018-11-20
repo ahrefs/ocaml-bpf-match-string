@@ -21,8 +21,9 @@ type code =
 let ptr = R1
 let len = R2
 
-(* stack pointer : R10 *)
-let stack = R10
+(* stack pointers : R10 = frame  R9 = stack *)
+let frame = R10
+let stack = R9
 
 type context = {
   true_ : label;
@@ -55,7 +56,7 @@ let pop_state l =
   l
 
 let drop_state l =
-  addi R10 8 ::
+  addi stack 8 ::
   l
 
 let with_backtrack what f ({ true_; false_; cur; next; }, l) =
@@ -232,8 +233,8 @@ let rec string_of_code = function
 
 let make prog =
   let exit value l = label value @@ movi R0 value :: ret :: l in
-  exec prog ({ true_ = 1; false_ = 0; next = 1; cur = 2; }, exit 1 @@ exit 0 []) |>
-  snd
+  mov stack frame ::
+  snd (exec prog ({ true_ = 1; false_ = 0; next = 1; cur = 2; }, exit 1 @@ exit 0 []))
 
 let assemble n = EBPF.assemble ~options:({ default with jump_back = true }) n
 
