@@ -15,6 +15,7 @@ depends: [
   "ocaml" {>= "4.02"}
   "ocamlfind" {build}
   "dune" {build}
+  "bpf"
 ]
 build: [
   ["dune" "subst"] {pinned}
