@@ -1,0 +1,22 @@
+opam-version: "2.0"
+name: "ubpf"
+version: "0.1"
+synopsis: "Simple eBPF DSL and assembler"
+license: "LGPL-3 with OCaml linking exception"
+maintainer: "Raman Varabets <roman.vorobets@gmail.com>"
+authors: [
+  "Joris Giovannangeli <joris.giovannangeli@ahrefs.com>"
+  "Raman Varabets <roman.vorobets@gmail.com>"
+]
+homepage: "https://github.com/cyberhuman/ocaml-bpf-match-string"
+bug-reports: "https://github.com/cyberhuman/ocaml-bpf-match-string/issues"
+dev-repo: "git+https://github.com/cyberhuman/ocaml-bpf-match-string.git"
+depends: [
+  "ocaml" {>= "4.02"}
+  "ocamlfind" {build}
+  "dune" {build}
+]
+build: [
+  ["dune" "subst"] {pinned}
+  ["dune" "build" "-p" name "-j" jobs]
+]

@@ -1,0 +1,18 @@
+lib: [
+  "_build/install/default/lib/bpf_match_string/META" {"META"}
+  "_build/install/default/lib/bpf_match_string/bpf_match_string.a" {"bpf_match_string.a"}
+  "_build/install/default/lib/bpf_match_string/bpf_match_string.cma" {"bpf_match_string.cma"}
+  "_build/install/default/lib/bpf_match_string/bpf_match_string.cmi" {"bpf_match_string.cmi"}
+  "_build/install/default/lib/bpf_match_string/bpf_match_string.cmt" {"bpf_match_string.cmt"}
+  "_build/install/default/lib/bpf_match_string/bpf_match_string.cmti" {"bpf_match_string.cmti"}
+  "_build/install/default/lib/bpf_match_string/bpf_match_string.cmx" {"bpf_match_string.cmx"}
+  "_build/install/default/lib/bpf_match_string/bpf_match_string.cmxa" {"bpf_match_string.cmxa"}
+  "_build/install/default/lib/bpf_match_string/bpf_match_string.cmxs" {"bpf_match_string.cmxs"}
+  "_build/install/default/lib/bpf_match_string/bpf_match_string.dune" {"bpf_match_string.dune"}
+  "_build/install/default/lib/bpf_match_string/bpf_match_string.ml" {"bpf_match_string.ml"}
+  "_build/install/default/lib/bpf_match_string/bpf_match_string.mli" {"bpf_match_string.mli"}
+  "_build/install/default/lib/bpf_match_string/opam" {"opam"}
+]
+doc: [
+  "_build/install/default/doc/bpf_match_string/LICENSE"
+]
