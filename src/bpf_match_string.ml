@@ -1,4 +1,3 @@
-open Prelude
 open Printf
 open EBPF
 
@@ -104,70 +103,39 @@ let check_eos cond (ctx, l) =
   ctx,
   jmpi ctx.false_ len (if cond then `NE else `EQ) 0 :: jump_true ctx l
 
-let load_dw r1 r2 i l =
-  movi r1 Int64.(logand 0xFFFFFFFFL i |> to_int) ::
-  movi r2 Int64.(logand 0xFFFFFFFFL (shift_right_logical i 32) |> to_int) ::
-  lshi r2 32 ::
-  or_ r1 r2 ::
-  l
-
 let match_string str ({ false_; _ } as ctx, l) =
-  let ldx' size at = EBPF.ldx size R3 (ptr, at) in
-  let extract_int count str =
-    match count with
-    | 1 -> CCString.Sub.get str 0 |> Char.code |> Int64.of_int
-    | 2 | 4 | 8 ->
-        let r = ref 0L in
-        for idx = 0 to count - 1 do
-          let c = CCString.Sub.get str idx |> Char.code |> Int64.of_int in
-          r := Int64.(logor !r (shift_left c (8 * idx)))
-        done;
-        !r
-    | n -> Exn.fail "unsupported unrolling size %d" n
+  let extract_int idx n str =
+    let rec loop res = function
+      | n when n < 0 -> res
+      | n ->
+      let c = Char.code str.[idx + n] in
+      loop Int64.(logor (shift_left res 8) (of_int c)) (n - 1)
+    in
+    let n = match n with B -> 1 | H -> 2 | W -> 4 | DW -> 8 in
+    loop 0L (n - 1)
   in
   let jmp_out i = jmpi false_ R3 `NE (Int64.to_int i) in
-  let rec unrolled idx str =
-    let remaining = CCString.Sub.length str in
+  let ldx size at = ldx size R3 (ptr, at) in
+  let cmp size idx str l = ldx size idx :: jmp_out (extract_int idx size str) :: l in
+  let rec unrolled str idx l =
+    let remaining = String.length str - idx in
     match remaining with
-    | 0 -> []
-    | 1 -> [ldx' B idx; jmp_out (extract_int 1 str) ]
-    | 2 -> [ldx' H idx; jmp_out (extract_int 2 str) ]
-    | 4 -> [ldx' W idx; jmp_out (extract_int 4 str)]
-    | n ->
-        if n < 8 then begin
-          let (acc, str, n, idx) =
-            if n > 4 then begin
-              let acc = [ldx' W idx; jmp_out (extract_int 4 str)] in
-              (acc, CCString.Sub.sub str 4 (n - 4),  n - 4, idx + 4)
-            end else
-            ([], str, n, idx)
-          in
-          let tail =
-            CCList.init n id |>
-            List.map (fun i ->
-              let str = CCString.Sub.sub str i 1 in
-              [ ldx' B (idx + i); jmp_out (extract_int 1 str) ]
-            ) |>
-            List.flatten
-          in
-          acc @ tail
-        end else begin
-          let c = extract_int 8 str in
-          let acc =
-            ldx' DW idx ::
-            load_dw R4 R5 c [
-              jmp false_ R3 `NE R4;
-            ]
-          in
-          acc @ unrolled (idx + 8) (CCString.Sub.sub str 8 (CCString.Sub.length str - 8))
-        end
+    | 0 -> l
+    | 1 -> cmp B idx str l
+    | 2 | 3 -> cmp H idx str (unrolled str (idx + 2) l)
+    | 4 | 5 | 6 | 7 -> cmp W idx str (unrolled str (idx + 4) l)
+    | _ ->
+    let c = extract_int idx DW str in
+    ldx DW idx ::
+    lddw R4 c ::
+    jmp false_ R3 `NE R4 ::
+    unrolled str (idx + 8) l
   in
   let length = String.length str in
   ctx,
   movi R5 length ::
-  jmp false_ R5 `GT R2 ::
-  unrolled 0 (CCString.Sub.make str 0 ~len:(String.length str)) @
-  begin
+  jmp false_ R5 `GT len ::
+  unrolled str 0 begin
     subi len length ::
     addi ptr length ::
     jump_true ctx l
@@ -221,16 +189,18 @@ and or_ prog (ctx, l) =
 and not_ prog ({ true_; false_; _ } as ctx, l) =
   with_backtrack `Both (exec prog) ({ ctx with true_ = false_; false_ = true_; }, l)
 
+let str_list f l = "[" ^ String.concat ";" (List.map f l) ^ "]"
+
 let rec string_of_code = function
   | Skip i -> sprintf "Skip %d" i
   | MatchString s -> sprintf "MatchString %S" s
-  | MatchChars l -> sprintf "MatchChars %s" (Stre.list (sprintf "%C") l)
-  | MismatchChars l -> sprintf "MismatchChars %s" (Stre.list (sprintf "%C") l)
+  | MatchChars l -> sprintf "MatchChars %s" (str_list (sprintf "%C") l)
+  | MismatchChars l -> sprintf "MismatchChars %s" (str_list (sprintf "%C") l)
   | CheckEOS b -> sprintf "CheckEOS %b" b
   | SkipToChar c -> sprintf "SkipToChar %C" c
-  | And l -> sprintf "And %s" (Stre.list (Stre.list string_of_code) l)
-  | Or l -> sprintf "Or %s" (Stre.list (Stre.list string_of_code) l)
-  | Not l -> sprintf "Not %s" (Stre.list string_of_code l)
+  | And l -> sprintf "And %s" (str_list (str_list string_of_code) l)
+  | Or l -> sprintf "Or %s" (str_list (str_list string_of_code) l)
+  | Not l -> sprintf "Not %s" (str_list string_of_code l)
 
 let make prog =
   let exit value l = label value @@ movi R0 value :: ret :: l in
