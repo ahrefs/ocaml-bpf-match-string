@@ -2,4 +2,10 @@
   (name bpf_match_string)
   (public_name bpf_match_string)
   (libraries bpf)
+  (modules bpf_match_string)
   (wrapped false))
+
+(test
+  (name test)
+  (libraries bpf_match_string ubpf)
+  (modules test))
