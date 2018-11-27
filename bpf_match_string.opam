@@ -1,5 +1,5 @@
 opam-version: "2.0"
-name: "ubpf"
+name: "bpf_match_string"
 version: "0.1"
 synopsis: "Simple eBPF DSL and assembler"
 license: "LGPL-3 with OCaml linking exception"
@@ -16,8 +16,12 @@ depends: [
   "ocamlfind" {build}
   "dune" {build}
   "bpf"
+  "ubpf" {with-test}
 ]
 build: [
   ["dune" "subst"] {pinned}
   ["dune" "build" "-p" name "-j" jobs]
+]
+run-test: [
+  ["dune" "runtest"]
 ]
