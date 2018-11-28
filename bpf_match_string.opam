@@ -8,9 +8,9 @@ authors: [
   "Joris Giovannangeli <joris.giovannangeli@ahrefs.com>"
   "Raman Varabets <roman.vorobets@gmail.com>"
 ]
-homepage: "https://github.com/cyberhuman/ocaml-bpf-match-string"
-bug-reports: "https://github.com/cyberhuman/ocaml-bpf-match-string/issues"
-dev-repo: "git+https://github.com/cyberhuman/ocaml-bpf-match-string.git"
+homepage: "https://github.com/ahrefs/ocaml-bpf-match-string"
+bug-reports: "https://github.com/ahrefs/ocaml-bpf-match-string/issues"
+dev-repo: "git+https://github.com/ahrefs/ocaml-bpf-match-string.git"
 depends: [
   "ocaml" {>= "4.02"}
   "ocamlfind" {build}
