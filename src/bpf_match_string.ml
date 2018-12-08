@@ -153,6 +153,25 @@ let mismatch_chars set (ctx, l) =
   let l = List.fold_left (fun l c -> jmpi ctx.false_ R3 `EQ (Char.code c) :: l) (jump_true ctx l) set in
   if set = [] then l else ldx B R3 (ptr, 0) :: l
 
+let make_backtrack exec what prog =
+  let need_backtrack_false = function
+    | [ Skip _ | MatchString _ | MatchChars _ | MismatchChars _ | CheckEOS _ | And _ | Or _ | Not _; ] -> false
+    | _ -> true
+  in
+  let need_backtrack_true = function
+    | [ MatchChars _ | MismatchChars _ | CheckEOS _ | And _ | Not _; ] -> false
+    | _ -> true
+  in
+  let need_backtrack =
+    match what with
+    | `False -> need_backtrack_false
+    | `True -> need_backtrack_true
+    | `Both -> (fun x -> need_backtrack_false x || need_backtrack_true x)
+  in
+  match List.exists need_backtrack prog with
+  | true -> fun prog (ctx, l) -> with_backtrack what (exec prog) (ctx, l)
+  | false -> exec
+
 let rec map_code code =
   match code with
   | Skip i -> skip i
@@ -175,30 +194,22 @@ and exec prog (ctx, l) =
     continue ctx
   end (ctx, l)
 and and_ prog (ctx, l) =
+  let exec = make_backtrack exec `Both prog in
   List.rev prog |>
   List.fold_left begin fun (ctx, l) prog ->
-    with_backtrack `Both (exec prog) (ctx, l) |>
+    exec prog (ctx, l) |>
     continue ctx
   end (ctx, l)
 and or_ prog (ctx, l) =
-  let skip_backtrack =
-    List.for_all begin function
-      | [ MatchString _ | MatchChars _ | MismatchChars _; CheckEOS _; And _; Not _; ] -> true
-      | _ -> false
-    end prog
-  in
-  let exec =
-    match skip_backtrack with
-    | true -> exec
-    | false -> (fun prog (ctx, l) -> with_backtrack `False (exec prog) (ctx, l))
-  in
+  let exec = make_backtrack exec `False prog in
   List.rev prog |>
   List.fold_left begin fun (ctx, l) prog ->
     exec prog (ctx, l) |>
     retry ctx
   end (ctx, l)
 and not_ prog ({ true_; false_; _ } as ctx, l) =
-  with_backtrack `Both (exec prog) ({ ctx with true_ = false_; false_ = true_; }, l)
+  let exec = make_backtrack exec `Both [ prog; ] in
+  exec prog ({ ctx with true_ = false_; false_ = true_; }, l)
 
 let str_list f l = "[" ^ String.concat ";" (List.map f l) ^ "]"
 

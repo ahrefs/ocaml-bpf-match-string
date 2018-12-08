@@ -105,6 +105,8 @@ let test_skip_to_char_mov2 = [ SkipToChar 'B'; MatchString "a"; ], zip inputs [ 
 let test_and_0 = [ And [ [ SkipToChar ' '; ]; [ MatchString "foo"; ]; ]; ], zip inputs [ n; n; n; n; y; n; n; ]
 let test_and_1 = [ And [ [ MismatchChars [ 'f'; ]; ]; [ Skip 3; ]; ]; ], zip inputs [ n; n; n; y; n; n; y; ]
 let test_and_2 = [ SkipToChar 'a'; And [ [ Skip 3; ]; [ MatchChars [ 'r'; ]; ]; ]; ], zip inputs [ n; n; n; n; y; n; y; ]
+let test_and_3 = [ And [ [ SkipToChar ' '; ]; [ CheckEOS false; ]; ]; ], zip inputs [ n; y; n; n; y; n; y; ]
+let test_and_4 = [ And [ [ Skip 7; ]; [ CheckEOS false; ]; ]; ], zip inputs [ n; n; n; n; y; n; y; ]
 let test_and_pre = [ And [ [ MatchString "foo"; ]; [ MatchString "f"; ]; ]; ], zip inputs [ n; n; n; n; y; y; n; ]
 let test_and_contr = [ And [ [ MatchString "foo"; ]; [ MatchString "bar"; ]; ]; ], zip inputs [ n; n; n; n; n; n; n; ]
 let test_and_fix = [ And [ [ MatchString "foo"; ]; [ Skip 7; ]; ]; MatchString "foobarBaz"; ], zip inputs [ n; n; n; n; y; n; n; ]
@@ -113,6 +115,8 @@ let test_or_0 = [ Or [ [ SkipToChar ' '; ]; [ MatchString "foo"; ]; ]; ], zip in
 let test_or_1 = [ Or [ [ MismatchChars [ 'f'; ]; ]; [ Skip 3; ]; ]; ], zip inputs [ n; y; y; y; y; y; y; ]
 let test_or_2 = [ SkipToChar 'a'; Or [ [ Skip 3; ]; [ MatchChars [ 'r'; ]; ]; ]; ], zip inputs [ n; n; n; n; y; y; y; ]
 let test_or_3 = [ SkipToChar 'r'; Or [ [ CheckEOS true; ]; [ MatchString " "; ]; ]; ], zip inputs [ n; n; n; n; n; y; y; ]
+let test_or_4 = [ Or [ [ SkipToChar '/'; ]; [ MatchString "foo"; ]; ]; ], zip inputs [ n; n; n; n; y; y; n; ]
+let test_or_5 = [ Or [ [ Skip 100; ]; [ MatchString "bar"; ]; ]; ], zip inputs [ n; n; n; n; n; n; y; ]
 let test_or_pre = [ Or [ [ MatchString "foo"; ]; [ MatchString "f"; ]; ]; ], zip inputs [ n; n; n; n; y; y; n; ]
 let test_or_contr = [ Or [ [ MatchString "foo"; ]; [ MatchString "bar"; ]; ]; ], zip inputs [ n; n; n; n; y; y; y; ]
 let test_or_mov1 = [ Or [ [ MatchString "foo"; ]; [ Skip 7; ]; ]; MatchString "barBaz"; ], zip inputs [ n; n; n; n; y; n; n; ]
@@ -206,6 +210,8 @@ let tests = [
   "and_0", test_and_0;
   "and_1", test_and_1;
   "and_2", test_and_2;
+  "and_3", test_and_3;
+  "and_4", test_and_4;
   "and_pre", test_and_pre;
   "and_contr", test_and_contr;
   "and_fix", test_and_fix;
@@ -213,6 +219,8 @@ let tests = [
   "or_1", test_or_1;
   "or_2", test_or_2;
   "or_3", test_or_3;
+  "or_4", test_or_4;
+  "or_5", test_or_5;
   "or_pre", test_or_pre;
   "or_contr", test_or_contr;
   "or_mov1", test_or_mov1;
