@@ -154,19 +154,16 @@ let mismatch_chars set (ctx, l) =
   if set = [] then l else ldx B R3 (ptr, 0) :: l
 
 let make_backtrack exec what prog =
-  let need_backtrack_false = function
-    | [ Skip _ | MatchString _ | MatchChars _ | MismatchChars _ | CheckEOS _ | And _ | Or _ | Not _; ] -> false
-    | _ -> true
-  in
-  let need_backtrack_true = function
-    | [ MatchChars _ | MismatchChars _ | CheckEOS _ | And _ | Not _; ] -> false
-    | _ -> true
+  let need_backtrack = function MatchChars _ | MismatchChars _ | CheckEOS _ | And _ | Not _ -> false | _ -> true in
+  let need_backtrack_true l = List.exists need_backtrack l in
+  let rec need_backtrack_false = function
+    | [] | [ Skip _ | MatchString _ | Or _; ] -> false
+    | hd :: tl -> need_backtrack hd || need_backtrack_false tl
   in
   let need_backtrack =
     match what with
     | `False -> need_backtrack_false
-    | `True -> need_backtrack_true
-    | `Both -> (fun x -> need_backtrack_false x || need_backtrack_true x)
+    | `True | `Both -> need_backtrack_true
   in
   match List.exists need_backtrack prog with
   | true -> fun prog (ctx, l) -> with_backtrack what (exec prog) (ctx, l)
