@@ -181,9 +181,20 @@ and and_ prog (ctx, l) =
     continue ctx
   end (ctx, l)
 and or_ prog (ctx, l) =
+  let skip_backtrack =
+    List.for_all begin function
+      | [ MatchString _ | MatchChars _ | MismatchChars _; CheckEOS _; And _; Not _; ] -> true
+      | _ -> false
+    end prog
+  in
+  let exec =
+    match skip_backtrack with
+    | true -> exec
+    | false -> (fun prog (ctx, l) -> with_backtrack `False (exec prog) (ctx, l))
+  in
   List.rev prog |>
   List.fold_left begin fun (ctx, l) prog ->
-    with_backtrack `False (exec prog) (ctx, l) |>
+    exec prog (ctx, l) |>
     retry ctx
   end (ctx, l)
 and not_ prog ({ true_; false_; _ } as ctx, l) =
