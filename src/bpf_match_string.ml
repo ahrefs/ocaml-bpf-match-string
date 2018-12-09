@@ -153,7 +153,7 @@ let mismatch_chars set (ctx, l) =
   let l = List.fold_left (fun l c -> jmpi ctx.false_ R3 `EQ (Char.code c) :: l) (jump_true ctx l) set in
   if set = [] then l else ldx B R3 (ptr, 0) :: l
 
-let make_backtrack exec what prog =
+let exec_with_backtrack exec what prog (ctx, l) =
   let need_backtrack = function MatchChars _ | MismatchChars _ | CheckEOS _ | And _ | Not _ -> false | _ -> true in
   let need_backtrack_true l = List.exists need_backtrack l in
   let rec need_backtrack_false = function
@@ -165,9 +165,9 @@ let make_backtrack exec what prog =
     | `False -> need_backtrack_false
     | `True | `Both -> need_backtrack_true
   in
-  match List.exists need_backtrack prog with
-  | true -> fun prog (ctx, l) -> with_backtrack what (exec prog) (ctx, l)
-  | false -> exec
+  match need_backtrack prog with
+  | true -> with_backtrack what (exec prog) (ctx, l)
+  | false -> exec prog (ctx, l)
 
 let rec map_code code =
   match code with
@@ -191,22 +191,19 @@ and exec prog (ctx, l) =
     continue ctx
   end (ctx, l)
 and and_ prog (ctx, l) =
-  let exec = make_backtrack exec `Both prog in
   List.rev prog |>
   List.fold_left begin fun (ctx, l) prog ->
-    exec prog (ctx, l) |>
+    exec_with_backtrack exec `Both prog (ctx, l) |>
     continue ctx
   end (ctx, l)
 and or_ prog (ctx, l) =
-  let exec = make_backtrack exec `False prog in
   List.rev prog |>
   List.fold_left begin fun (ctx, l) prog ->
-    exec prog (ctx, l) |>
+    exec_with_backtrack exec `False prog (ctx, l) |>
     retry ctx
   end (ctx, l)
 and not_ prog ({ true_; false_; _ } as ctx, l) =
-  let exec = make_backtrack exec `Both [ prog; ] in
-  exec prog ({ ctx with true_ = false_; false_ = true_; }, l)
+  exec_with_backtrack exec `Both prog ({ ctx with true_ = false_; false_ = true_; }, l)
 
 let str_list f l = "[" ^ String.concat ";" (List.map f l) ^ "]"
 
