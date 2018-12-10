@@ -12,6 +12,7 @@ type code =
   | MismatchChars of char list
   | CheckEOS of bool
   | SkipToChar of char
+  | MatchContainer of [ `VInt ] * code list
   | And of code list list
   | Or of code list list
   | Not of code list
@@ -101,6 +102,35 @@ let with_backtrack what f (ctx, l) =
 
 let bound_check ctx l = jmpi ctx.false_ len `EQ 0 :: l
 
+let with_match_container f (ctx, l) =
+  let push (ctx, l) = ctx, pushl [ R3; len; ptr; ] @@ mov len R3 :: l in
+  let pop_false l = popl [ R3; len; ptr; ] l in
+  let pop_true l = pop_false @@ add ptr R3 :: sub len R3 :: l in
+  with_stack push pop_true pop_false f (ctx, l)
+
+let read_vint ({ true_; cur; _ } as ctx) l =
+  { ctx with cur = cur + 2; },
+  movi R3 0 :: begin
+  label cur @@
+    bound_check ctx @@
+    ldx B R4 (ptr, 0) ::
+    subi len 1 ::
+    addi ptr 1 ::
+    jmpi (cur + 1) R4 `SET 0x80 ::
+    or_ R3 R4 ::
+    jump true_ begin
+  label (cur + 1) @@
+    andi R4 0x7F ::
+    or_ R3 R4 ::
+    lshi R3 7 ::
+    jump cur l
+  end (* jump *)
+  end (* movi *)
+
+let with_match_container_vint f (ctx, l) =
+  let (ctx, l) = with_match_container f (ctx, l) in
+  read_vint ctx l
+
 let skip n (ctx, l) =
   ctx,
   movi R5 n ::
@@ -111,7 +141,7 @@ let skip n (ctx, l) =
 
 (* XXX slow could be unrolled / vectorized *)
 let skip_to_char c ({ cur; _ } as ctx, l) =
-  { ctx with cur = cur + 1; },
+  { ctx with cur = cur + 1; next = cur; },
   label cur @@
     bound_check ctx @@
     ldx B R3 (ptr, 0) ::
@@ -198,6 +228,7 @@ let rec map_code code =
   | MismatchChars l -> mismatch_chars l
   | CheckEOS b -> check_eos b
   | SkipToChar c -> skip_to_char c
+  | MatchContainer (`VInt, l) -> match_container_vint l
   | And l -> and_ l
   | Or l -> or_ l
   | Not l -> not_ l
@@ -225,6 +256,8 @@ and or_ prog (ctx, l) =
   end (ctx, l)
 and not_ prog ({ true_; false_; _ } as ctx, l) =
   exec_with_backtrack exec `Both prog ({ ctx with true_ = false_; false_ = true_; }, l)
+and match_container_vint prog (ctx, l) =
+  with_match_container_vint (exec prog) (ctx, l)
 
 let str_list f l = "[" ^ String.concat ";" (List.map f l) ^ "]"
 
@@ -235,6 +268,7 @@ let rec string_of_code = function
   | MismatchChars l -> sprintf "MismatchChars %s" (str_list (sprintf "%C") l)
   | CheckEOS b -> sprintf "CheckEOS %b" b
   | SkipToChar c -> sprintf "SkipToChar %C" c
+  | MatchContainer (`VInt, l) -> sprintf "MatchContainer %s" (str_list string_of_code l)
   | And l -> sprintf "And %s" (str_list (str_list string_of_code) l)
   | Or l -> sprintf "Or %s" (str_list (str_list string_of_code) l)
   | Not l -> sprintf "Not %s" (str_list string_of_code l)

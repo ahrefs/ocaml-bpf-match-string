@@ -21,6 +21,10 @@ type code =
   | SkipToChar of char
     (** [SkipToChar c] moves current position just after the first occurence of [c] or
         returns false if EOS is reached in the process *)
+  | MatchContainer of [ `VInt ] * code list
+    (** [MatchContainer (`VInt, prog)] reads a variable integer-encoded container length,
+        then matches prog and set the current position after the container;
+        returns false if prog does not match or container length is invalid *)
   | And of code list list
     (** [And [prog1; prog2; ...]] ensures all of [prog1, prog2, ...] match, returns false otherwise;
         does not advance the current position *)
