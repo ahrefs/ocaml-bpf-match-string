@@ -19,16 +19,16 @@ type code =
        [CheckEOS false] checks if current position is not end of string, returns false on EOS
     *)
   | SkipToChar of char
-  (** [SkipToChar c] moves current position just after the first occurence of [c] or
-      returns false if EOS is reached in the process *)
+    (** [SkipToChar c] moves current position just after the first occurence of [c] or
+        returns false if EOS is reached in the process *)
   | And of code list list
-  (** [And [prog1; prog2; ...]] ensures all of [prog1, prog2, ...] match, returns false otherwise;
-      does not advance the current position *)
+    (** [And [prog1; prog2; ...]] ensures all of [prog1, prog2, ...] match, returns false otherwise;
+        does not advance the current position *)
   | Or of code list list
-  (** [Or [prog1; prog2; ...]] ensures one of [prog1, prog2, ...] match, returns false otherwise;
-     DOES advance the current position *)
+    (** [Or [prog1; prog2; ...]] ensures one of [prog1, prog2, ...] match, returns false otherwise;
+       DOES advance the current position *)
   | Not of code list
-  (** [Not prog] ensures prog does not match; returns false if it does. *)
+    (** [Not prog] ensures prog does not match; returns false if it does. *)
 
 val string_of_code : code -> string
 
