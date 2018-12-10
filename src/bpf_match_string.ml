@@ -13,6 +13,7 @@ type code =
   | CheckEOS of bool
   | SkipToChar of char
   | MatchContainer of [ `VInt ] * code list
+  | MatchInt of [ `LE ] * [ `VInt ] * [ `Normal | `ZigZag ] * int
   | And of code list list
   | Or of code list list
   | Not of code list
@@ -192,6 +193,20 @@ let match_string str ({ false_; _ } as ctx, l) =
     jump_true ctx l
   end
 
+let match_le_vint ~mode i =
+  let make_vint i =
+    let buf = Buffer.create 9 in
+    let rec loop buf i =
+      Buffer.add_char buf (Char.chr (i land 0x7F));
+      match i >= 0x80 with
+      | true -> loop buf (i lsr 7)
+      | false -> Buffer.contents buf
+    in
+    loop buf i
+  in
+  let i = match mode with `Normal -> i | `ZigZag -> i asr (Sys.int_size - 1) lxor (i lsl 1) in
+  match_string (make_vint i)
+
 let match_chars set (ctx, l) =
   ctx,
   bound_check ctx @@
@@ -229,6 +244,7 @@ let rec map_code code =
   | CheckEOS b -> check_eos b
   | SkipToChar c -> skip_to_char c
   | MatchContainer (`VInt, l) -> match_container_vint l
+  | MatchInt (`LE, `VInt, mode, i) -> match_le_vint ~mode i
   | And l -> and_ l
   | Or l -> or_ l
   | Not l -> not_ l
@@ -269,6 +285,7 @@ let rec string_of_code = function
   | CheckEOS b -> sprintf "CheckEOS %b" b
   | SkipToChar c -> sprintf "SkipToChar %C" c
   | MatchContainer (`VInt, l) -> sprintf "MatchContainer %s" (str_list string_of_code l)
+  | MatchInt (`LE, `VInt, _mode, i) -> sprintf "MatchInt %d" i
   | And l -> sprintf "And %s" (str_list (str_list string_of_code) l)
   | Or l -> sprintf "Or %s" (str_list (str_list string_of_code) l)
   | Not l -> sprintf "Not %s" (str_list string_of_code l)

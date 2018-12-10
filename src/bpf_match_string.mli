@@ -25,6 +25,10 @@ type code =
     (** [MatchContainer (`VInt, prog)] reads a variable integer-encoded container length,
         then matches prog and set the current position after the container;
         returns false if prog does not match or container length is invalid *)
+  | MatchInt of [ `LE ] * [ `VInt ] * [ `Normal | `ZigZag ] * int
+    (** MatchInt (`LE, `VInt, encoding, i) matches current position with integer [i]
+        using variable-length little-endian encoding, or
+        returns false if there is no match *)
   | And of code list list
     (** [And [prog1; prog2; ...]] ensures all of [prog1, prog2, ...] match, returns false otherwise;
         does not advance the current position *)
