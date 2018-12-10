@@ -42,30 +42,33 @@ let jump_true { true_; next; _ } l = jump_or_skip true_ next l
 
 let jump_false { false_; next; _ } l = jump_or_skip false_ next l
 
-let push reg l = stx DW (stack, -8) reg :: subi stack 8 :: l
+let pushl regs l =
+  match regs with
+  | [] -> l
+  | _ ->
+  List.rev regs |>
+  List.fold_left begin fun (ofs, l) reg ->
+    ofs - 8,
+    stx DW (stack, ofs) reg :: l
+  end (-8, subi stack (8 * List.length regs) :: l) |>
+  snd
 
-let pop reg l = ldx DW reg (stack, 0) :: addi stack 8 :: l
+let popl regs l =
+  match regs with
+  | [] -> l
+  | _ ->
+  List.rev regs |>
+  List.fold_left begin fun (ofs, l) reg ->
+    ofs + 8,
+    ldx DW reg (stack, ofs) :: l
+  end (0, addi stack (8 * List.length regs) :: l) |>
+  snd
 
-let push_state (ctx, l) = ctx, push len l
+let push reg l = pushl [ reg; ] l
 
-let pop_state l =
-  pop R3 @@
-  sub len R3 :: (* delta = len - old_len *)
-  add ptr len :: (* ptr += delta *)
-  mov len R3 :: (* len = old_len *)
-  l
+let pop reg l = popl [ reg; ] l
 
-let drop_state l =
-  addi stack 8 ::
-  l
-
-let with_backtrack what f ({ true_; false_; cur; next; _ }, l) =
-  let (pop_true, pop_false) =
-    match what with
-    | `True -> pop_state, drop_state
-    | `False -> drop_state, pop_state
-    | `Both -> pop_state, pop_state
-  in
+let with_stack push_state pop_true pop_false f ({ true_; false_; cur; next; _ }, l) =
   let ctx = { true_ = cur; false_ = cur + 1; cur = cur + 2; next = cur; stack = true; } in
   push_state @@
   f begin
@@ -77,6 +80,24 @@ let with_backtrack what f ({ true_; false_; cur; next; _ }, l) =
       pop_false @@
       jump_or_skip false_ next l
   end
+
+let with_backtrack what f (ctx, l) =
+  let push (ctx, l) = ctx, push len l in
+  let pop l =
+    pop R3 @@
+    sub len R3 :: (* delta = len - old_len *)
+    add ptr len :: (* ptr += delta *)
+    mov len R3 :: (* len = old_len *)
+    l
+  in
+  let drop l = addi stack 8 :: l in
+  let (pop_true, pop_false) =
+    match what with
+    | `True -> pop, drop
+    | `False -> drop, pop
+    | `Both -> pop, pop
+  in
+  with_stack push pop_true pop_false f (ctx, l)
 
 let bound_check ctx l = jmpi ctx.false_ len `EQ 0 :: l
 
